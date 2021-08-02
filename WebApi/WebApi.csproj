@@ -19,7 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\IdentityLibrary\Infrastructure.IdentityLibrary.csproj" />
+    <ProjectReference Include="..\Infrastructure.IdentityLibrary\Infrastructure.IdentityLibrary.csproj" />
+    <ProjectReference Include="..\Infrastructure.MailLibrary\Infrastructure.EMailLibrary.csproj" />
+    <ProjectReference Include="..\Infrastructure.Shared\Infrastructure.SharedLibrary.csproj" />
   </ItemGroup>
 
 </Project>
