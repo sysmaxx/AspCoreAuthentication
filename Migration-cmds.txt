@@ -1,0 +1,2 @@
+get-help add-migration -detailed
+add-migration Initial -c "IdentityContext" -Project Infrastructure\Infrastructure.IdentityLibrary
