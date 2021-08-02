@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using System.Collections;
 
 namespace Infrastructure.IdentityLibrary.Context
 {
@@ -10,6 +11,16 @@ namespace Infrastructure.IdentityLibrary.Context
         public IdentityContext(DbContextOptions<IdentityContext> options) : base(options)
         {
         }
+
+        public virtual DbSet<ApplicationUser> ApplicationUsers { get; set; }
+        public virtual DbSet<IdentityRole> IdentityRoles { get; set; }
+        public virtual DbSet<IdentityUserRole<string>> IdentityUserRoles { get; set; }
+        public virtual DbSet<IdentityUserClaim<string>> IdentityUserClaims { get; set; }
+        public virtual DbSet<IdentityUserLogin<string>> IdentityUserLogins { get; set; }
+        public virtual DbSet<IdentityRoleClaim<string>> IdentityRoleClaims { get; set; }
+        public virtual DbSet<IdentityUserToken<string>> IdentityUserTokens { get; set; }
+        public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -17,6 +28,11 @@ namespace Infrastructure.IdentityLibrary.Context
             builder.Entity<ApplicationUser>(entity =>
             {
                 entity.ToTable(name: "User");
+            });
+
+            builder.Entity<RefreshToken>(entity =>
+            {
+                entity.ToTable(name: "RefreshToken");
             });
 
             builder.Entity<IdentityRole>(entity =>

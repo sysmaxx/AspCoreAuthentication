@@ -6,7 +6,6 @@ using Infrastructure.IdentityLibrary.Models.DTOs;
 using Infrastructure.IdentityLibrary.Models.Enums;
 using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -43,34 +42,6 @@ namespace Infrastructure.IdentityLibrary.Services
             _identityContext = identityContext;
         }
 
-        public async Task<ApiResponse<AuthenticationResponse>> AuthenticateUserAsync(AuthenticationRequest request)
-        {
-            var user = await _userManager.FindByEmailAsync(request.Email).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found with EMail: '{request.Email}'.");
-
-            if (!user.EmailConfirmed)
-                throw new AccountNotConfirmedException($"E-Mail: '{request.Email}' not confirmed.");
-
-            if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
-                throw new InvalidCredentialsException($"Invalid credentials for EMail: '{request.Email}'.");
-
-            var response = new AuthenticationResponse()
-            {
-                Id = user.Id,
-                JWToken = new JwtSecurityTokenHandler().WriteToken(await GenerateJWToken(user).ConfigureAwait(false)),
-                Email = user.Email,
-                UserName = user.UserName,
-                Roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false),
-                IsVerified = user.EmailConfirmed,
-                RefreshToken = GenerateRefreshToken().Token
-            };
-
-            // ToDo: Revoke all activ refreshtokesn
-            //       Save new Refreshtoken
-
-            return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
-        }
-
         public async Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin)
         {
             if (await _userManager.FindByNameAsync(request.UserName).ConfigureAwait(false) is not null)
@@ -99,6 +70,37 @@ namespace Infrastructure.IdentityLibrary.Services
             return new ApiResponse<string>(user.Id, message: $"User Registered.");
         }
 
+
+        public async Task<ApiResponse<AuthenticationResponse>> AuthenticateUserAsync(AuthenticationRequest request)
+        {
+            var user = await _userManager.FindByEmailAsync(request.Email).ConfigureAwait(false)
+                ?? throw new AccountNotFoundException($"Account not found with EMail: '{request.Email}'.");
+
+            if (!user.EmailConfirmed)
+                throw new AccountNotConfirmedException($"E-Mail: '{request.Email}' not confirmed.");
+
+            if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
+                throw new InvalidCredentialsException($"Invalid credentials for EMail: '{request.Email}'.");
+
+            var jwtToken = new JwtSecurityTokenHandler().WriteToken(await GenerateJWToken(user).ConfigureAwait(false));
+            var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
+            var refreshToken = await GetRefreshToken(user).ConfigureAwait(false);
+
+            var response = new AuthenticationResponse()
+            {
+                Id = user.Id,
+                JWToken = jwtToken,
+                Email = user.Email,
+                UserName = user.UserName,
+                Roles = roles,
+                IsVerified = user.EmailConfirmed,
+                RefreshToken = refreshToken.Token,
+                RefreshTokenExpiration = refreshToken.Expires
+            };
+
+            return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
+        }
+
         private async Task<JwtSecurityToken> GenerateJWToken(ApplicationUser user)
         {
             var userClaims = await _userManager.GetClaimsAsync(user).ConfigureAwait(false);
@@ -124,29 +126,29 @@ namespace Infrastructure.IdentityLibrary.Services
         }
 
 
-
-
-        public async Task<ApiResponse<string>> ConfirmEmailAsync(string userId, string code)
+        private async Task<RefreshToken> GetRefreshToken(ApplicationUser user)
         {
-            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found");
+            await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync();
+            var token = user.RefreshTokens.FirstOrDefault(token => token.IsActive);
 
-            code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+            if (token is null)
+            {
+                token = GenerateRefreshToken();
+                user.RefreshTokens.Add(token);
+                await _userManager.UpdateAsync(user);
+            }
 
-            var result = await _userManager.ConfirmEmailAsync(user, code).ConfigureAwait(false);
-            if (!result.Succeeded)
-                throw new Exception($"An error occured while confirming {user.Email}.");
-
-            return new ApiResponse<string>(user.Id, message: $"Account Confirmed for {user.Email}. You can now use the /api/Account/authenticate endpoint.");
+            return token;
         }
+
+
 
         private RefreshToken GenerateRefreshToken()
         {
             return new RefreshToken
             {
                 Token = RandomTokenString(_jwtSettings.RefreshTokenLength),
-                // ToDO: Make expiry configurable
-                Expires = DateTime.UtcNow.AddDays(7),
+                Expires = DateTime.UtcNow.AddHours(_jwtSettings.RefreshTokenDurationInHours),
                 Created = DateTime.UtcNow
             };
         }

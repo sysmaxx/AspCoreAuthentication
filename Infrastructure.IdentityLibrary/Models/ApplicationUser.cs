@@ -5,6 +5,10 @@ namespace Infrastructure.IdentityLibrary.Models
 {
     public class ApplicationUser : IdentityUser
     {
-        public IEnumerable<RefreshToken> RefreshTokens { get; set; }
+        public ApplicationUser()
+        {
+            RefreshTokens = new HashSet<RefreshToken>();
+        }
+        public virtual ICollection<RefreshToken> RefreshTokens { get; set; }
     }
 }

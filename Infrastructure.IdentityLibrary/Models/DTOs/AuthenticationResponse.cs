@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Infrastructure.IdentityLibrary.Models.DTOs
@@ -13,5 +14,7 @@ namespace Infrastructure.IdentityLibrary.Models.DTOs
         public string JWToken { get; set; }
         //[JsonIgnore]
         public string RefreshToken { get; set; }
+        public DateTime RefreshTokenExpiration { get; set; }
+
     }
 }

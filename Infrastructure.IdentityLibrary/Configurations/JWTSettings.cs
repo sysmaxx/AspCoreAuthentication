@@ -8,5 +8,6 @@
         public double DurationInMinutes { get; set; }
 
         public int RefreshTokenLength { get; set; }
+        public int RefreshTokenDurationInHours { get; set; }
     }
 }
