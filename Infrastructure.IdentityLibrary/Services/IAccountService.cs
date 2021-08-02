@@ -8,5 +8,7 @@ namespace Infrastructure.IdentityLibrary.Services
     {
         Task<ApiResponse<AuthenticationResponse>> AuthenticateUserAsync(AuthenticationRequest request);
         Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin);
+
+        Task<ApiResponse<AuthenticationResponse>> RefreshTokensAsync(RefreshTokenRequest request);
     }
 }

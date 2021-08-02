@@ -9,6 +9,7 @@ namespace Infrastructure.IdentityLibrary.Models
         {
             RefreshTokens = new HashSet<RefreshToken>();
         }
+
         public virtual ICollection<RefreshToken> RefreshTokens { get; set; }
     }
 }

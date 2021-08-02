@@ -33,5 +33,11 @@ namespace WebApi.Controllers
         {
             return Ok(await _accountService.AuthenticateUserAsync(request));
         }
+
+        [HttpPost("refreshTokens")]
+        public async Task<IActionResult> RefreshTokensAsync(RefreshTokenRequest request)
+        {
+            return Ok(await _accountService.RefreshTokensAsync(request));
+        }
     }
 }

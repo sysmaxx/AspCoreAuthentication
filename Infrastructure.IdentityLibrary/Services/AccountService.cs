@@ -82,6 +82,13 @@ namespace Infrastructure.IdentityLibrary.Services
             if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
                 throw new InvalidCredentialsException($"Invalid credentials for EMail: '{request.Email}'.");
 
+            AuthenticationResponse response = await CreateJwtResponse(user).ConfigureAwait(false);
+
+            return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
+        }
+
+        private async Task<AuthenticationResponse> CreateJwtResponse(ApplicationUser user)
+        {
             var jwtToken = new JwtSecurityTokenHandler().WriteToken(await GenerateJWToken(user).ConfigureAwait(false));
             var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
             var refreshToken = await GetRefreshToken(user).ConfigureAwait(false);
@@ -97,8 +104,52 @@ namespace Infrastructure.IdentityLibrary.Services
                 RefreshToken = refreshToken.Token,
                 RefreshTokenExpiration = refreshToken.Expires
             };
+            return response;
+        }
 
-            return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
+        public async Task<ApiResponse<AuthenticationResponse>> RefreshTokensAsync(RefreshTokenRequest request)
+        {
+            var userId = GetUserIdFromToken(request.JWToken);
+
+            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
+                ?? throw new AccountNotFoundException($"Account not found.");
+            // ToDO: activate lazy loading for RefreshTokens 
+            await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
+            var refreshToken = user.RefreshTokens.FirstOrDefault(token => token.Token == request.RefreshToken) 
+                ?? throw new RefreshTokenNotFoundException();
+
+            if (!refreshToken.IsActive)
+                throw new RefreshTokenExpiredException();
+
+            refreshToken.Revoked = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user).ConfigureAwait(false);
+
+            AuthenticationResponse response = await CreateJwtResponse(user).ConfigureAwait(false);
+
+            return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
+
+        }
+
+        private string GetUserIdFromToken(string token)
+        {
+            var tokenValidationParamters = new TokenValidationParameters
+            {
+                ValidateAudience = true,
+                ValidateIssuer = true,
+                ValidateActor = false,
+                ValidateLifetime = false,
+                ValidIssuer = _jwtSettings.Issuer,
+                ValidAudience = _jwtSettings.Audience,
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(
+                        Encoding.ASCII.GetBytes(_jwtSettings.Key)
+                    )
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParamters, out SecurityToken securityToken);
+
+            return principal.FindFirst("uid")?.Value ?? throw new SecurityTokenException($"Missing claim: UID!");
         }
 
         private async Task<JwtSecurityToken> GenerateJWToken(ApplicationUser user)
@@ -128,6 +179,7 @@ namespace Infrastructure.IdentityLibrary.Services
 
         private async Task<RefreshToken> GetRefreshToken(ApplicationUser user)
         {
+            // ToDO: activate lazy loading for RefreshTokens
             await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync();
             var token = user.RefreshTokens.FirstOrDefault(token => token.IsActive);
 
@@ -141,8 +193,6 @@ namespace Infrastructure.IdentityLibrary.Services
             return token;
         }
 
-
-
         private RefreshToken GenerateRefreshToken()
         {
             return new RefreshToken
@@ -155,11 +205,13 @@ namespace Infrastructure.IdentityLibrary.Services
 
         private static string RandomTokenString(int length)
         {
-            using var rngCryptoServiceProvider = new RNGCryptoServiceProvider();
-            var randomBytes = new byte[length];
-            rngCryptoServiceProvider.GetBytes(randomBytes);
-            return BitConverter.ToString(randomBytes).Replace("-", "");
+            using var cryptoProvider = new RNGCryptoServiceProvider();
+            var bytes = new byte[length];
+            cryptoProvider.GetBytes(bytes);
+            return string.Concat(bytes.Select(b => b.ToString("X2")));
         }
+
+
 
 
         // ConfirmEMail
