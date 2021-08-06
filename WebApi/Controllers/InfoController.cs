@@ -1,8 +1,7 @@
-﻿using Infrastructure.IdentityLibrary.Models.Enums;
+﻿using Infrastructure.IdentityLibrary.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System;
 using System.Diagnostics;
 using WebApi.Models;
 
@@ -12,6 +11,14 @@ namespace WebApi.Controllers
     [ApiController]
     public class InfoController : ControllerBase
     {
+
+        private readonly IAuthenticatedUserService _authenticatedUserService;
+
+        public InfoController(IAuthenticatedUserService authenticatedUserService)
+        {
+            _authenticatedUserService = authenticatedUserService;
+        }
+
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ServiceInfo))]
         [HttpGet()]
         [Authorize(Roles = "User")]
@@ -21,7 +28,7 @@ namespace WebApi.Controllers
             var lastUpdate = System.IO.File.GetLastWriteTime(assembly.Location);
             var version = FileVersionInfo.GetVersionInfo(assembly.Location).ProductVersion;
 
-            return Ok(new ServiceInfo { Version = version, LastUpdate = lastUpdate });
+            return Ok(new ServiceInfo { Version = version, LastUpdate = lastUpdate, UserId = _authenticatedUserService.UserId });
         }
     }
 }

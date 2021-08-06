@@ -29,6 +29,8 @@ namespace Infrastructure.IdentityLibrary.Extensions
 
             services.AddTransient<IAccountService, AccountService>();
 
+            services.AddTransient<IAuthenticatedUserService, AuthenticatedUserService>();
+
             services.Configure<JWTSettings>(configuration.GetSection("JWTSettings"));
 
             services.AddAuthentication(options =>
