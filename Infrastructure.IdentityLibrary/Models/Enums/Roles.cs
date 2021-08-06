@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Infrastructure.IdentityLibrary.Models.Enums
 {
-    public enum Roles
+    public struct Roles
     {
-        Admin,
-        User
+        public const string Admin = nameof(Admin);
+        public const string User = nameof(User);
     }
 }

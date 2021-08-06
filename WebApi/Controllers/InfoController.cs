@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Infrastructure.IdentityLibrary.Models.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Diagnostics;
@@ -12,6 +14,7 @@ namespace WebApi.Controllers
     {
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ServiceInfo))]
         [HttpGet()]
+        [Authorize(Roles = "User")]
         public ActionResult<string> Info()
         {
             var assembly = typeof(Startup).Assembly;

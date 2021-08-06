@@ -30,7 +30,7 @@ namespace WebApi.Extensions
                     Type = SecuritySchemeType.ApiKey,
                     Scheme = "Bearer",
                     BearerFormat = "JWT",
-                    Description = "Input your Bearer token to access this API",
+                    Description = "Input your Bearer token to access this API.<br> Bearer {Your Token}",
                 });
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
                 {

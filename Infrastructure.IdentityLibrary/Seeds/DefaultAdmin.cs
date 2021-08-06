@@ -23,8 +23,8 @@ namespace Infrastructure.IdentityLibrary.Seeds
                 if (user == null)
                 {
                     await userManager.CreateAsync(defaultUser, "Ch4ng3M3f4$T!!!");
-                    await userManager.AddToRoleAsync(defaultUser, Roles.Admin.ToString());
-                    await userManager.AddToRoleAsync(defaultUser, Roles.User.ToString());
+                    await userManager.AddToRoleAsync(defaultUser, Roles.Admin);
+                    await userManager.AddToRoleAsync(defaultUser, Roles.User);
                 }
             }
         }

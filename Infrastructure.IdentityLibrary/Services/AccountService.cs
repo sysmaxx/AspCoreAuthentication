@@ -23,7 +23,6 @@ namespace Infrastructure.IdentityLibrary.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly JWTSettings _jwtSettings;
         private readonly IdentityContext _identityContext;
 
@@ -38,7 +37,6 @@ namespace Infrastructure.IdentityLibrary.Services
             _userManager = userManager;
             _roleManager = roleManager;
             _jwtSettings = jwtSettings.Value;
-            _signInManager = signInManager;
             _identityContext = identityContext;
         }
 
@@ -127,7 +125,6 @@ namespace Infrastructure.IdentityLibrary.Services
             AuthenticationResponse response = await CreateJwtResponse(user).ConfigureAwait(false);
 
             return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
-
         }
 
         private string GetUserIdFromToken(string token)
@@ -149,24 +146,27 @@ namespace Infrastructure.IdentityLibrary.Services
             var tokenHandler = new JwtSecurityTokenHandler();
             var principal = tokenHandler.ValidateToken(token, tokenValidationParamters, out SecurityToken securityToken);
 
-            return principal.FindFirst("uid")?.Value ?? throw new SecurityTokenException($"Missing claim: UID!");
+            return principal.FindFirst(CustomRegisteredClaimNames.UserID)?.Value 
+                ?? throw new SecurityTokenException($"Missing claim: {CustomRegisteredClaimNames.UserID}");
         }
 
         private async Task<JwtSecurityToken> GenerateJWToken(ApplicationUser user)
         {
             var userClaims = await _userManager.GetClaimsAsync(user).ConfigureAwait(false);
             var roleClaims = (await _userManager.GetRolesAsync(user).ConfigureAwait(false))
-                .Select(role => new Claim("roles", role)).ToList();
+                .Select(role => new Claim(CustomRegisteredClaimNames.Roles, role)).ToList();
 
             var claims = new List<Claim>()
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("uid", user.Id),
-            }
-            .Union(userClaims)
-            .Union(roleClaims);
+                new Claim(CustomRegisteredClaimNames.UserID, user.Id),
+
+            };
+
+            claims.AddRange(userClaims);
+            claims.AddRange(roleClaims);
 
             return new JwtSecurityToken(
                 issuer: _jwtSettings.Issuer,
@@ -212,14 +212,10 @@ namespace Infrastructure.IdentityLibrary.Services
         }
 
 
-
-
         // ConfirmEMail
 
         // ResetPassword
 
-        // Revoke Tokens
-
-        // Refresh Tokens
+        // Add Roles to User
     }
 }
