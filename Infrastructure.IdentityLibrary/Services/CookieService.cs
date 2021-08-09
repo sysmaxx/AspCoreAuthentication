@@ -3,7 +3,7 @@ using System;
 
 namespace Infrastructure.IdentityLibrary.Services
 {
-    internal class CookieService : ICookieService
+    public class CookieService : ICookieService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
         private IResponseCookies ResponseCookies => _httpContextAccessor.HttpContext.Response.Cookies;
@@ -19,7 +19,7 @@ namespace Infrastructure.IdentityLibrary.Services
         {
             var option = new CookieOptions
             {
-                Expires = DateTime.Now.AddMinutes(expireInHours)
+                Expires = DateTime.Now.AddHours(expireInHours)
             };
 
             ResponseCookies.Append(key, value, option);

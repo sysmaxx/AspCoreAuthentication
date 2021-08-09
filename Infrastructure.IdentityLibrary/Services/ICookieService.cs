@@ -1,6 +1,6 @@
 ﻿namespace Infrastructure.IdentityLibrary.Services
 {
-    internal interface ICookieService
+    public interface ICookieService
     {
         string Get(string key);
         void Remove(string key);

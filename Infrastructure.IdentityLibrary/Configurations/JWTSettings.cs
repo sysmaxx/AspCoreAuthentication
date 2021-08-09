@@ -9,5 +9,7 @@
 
         public int RefreshTokenLength { get; set; }
         public int RefreshTokenDurationInHours { get; set; }
+        public bool SaveRefreshTokenInCookie { get; set; }
+
     }
 }

@@ -25,19 +25,21 @@ namespace Infrastructure.IdentityLibrary.Services
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly JWTSettings _jwtSettings;
         private readonly IdentityContext _identityContext;
+        private readonly ICookieService _cookieService;
 
         public AccountService(
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IOptions<JWTSettings> jwtSettings,
-            SignInManager<ApplicationUser> signInManager,
-            IdentityContext identityContext
+            IdentityContext identityContext,
+            ICookieService cookieService
             )
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _jwtSettings = jwtSettings.Value;
             _identityContext = identityContext;
+            _cookieService = cookieService;
         }
 
         public async Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin)
@@ -91,6 +93,9 @@ namespace Infrastructure.IdentityLibrary.Services
             var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
             var refreshToken = await CreateRefreshToken(user).ConfigureAwait(false);
 
+            if(_jwtSettings.SaveRefreshTokenInCookie)
+                _cookieService.Set(CookieSettings.Name, refreshToken.Token, _jwtSettings.RefreshTokenDurationInHours);
+
             var response = new AuthenticationResponse()
             {
                 Id = user.Id,
@@ -111,6 +116,10 @@ namespace Infrastructure.IdentityLibrary.Services
 
             var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
                 ?? throw new AccountNotFoundException($"Account not found.");
+
+            if (_jwtSettings.SaveRefreshTokenInCookie)
+                request.RefreshToken = _cookieService.Get(CookieSettings.Name);
+
             // ToDO: activate lazy loading for RefreshTokens 
             await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
             var refreshToken = user.RefreshTokens.FirstOrDefault(token => token.Token == request.RefreshToken) 
