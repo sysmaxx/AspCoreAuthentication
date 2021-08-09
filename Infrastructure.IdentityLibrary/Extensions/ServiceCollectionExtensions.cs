@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace Infrastructure.IdentityLibrary.Extensions
 {
-    public static class IdentityServiceExtensions
+    public static class ServiceCollectionExtensions
     {
         public static void AddIdentityInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
