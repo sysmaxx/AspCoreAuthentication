@@ -89,7 +89,7 @@ namespace Infrastructure.IdentityLibrary.Services
         {
             var jwtToken = new JwtSecurityTokenHandler().WriteToken(await GenerateJWToken(user).ConfigureAwait(false));
             var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
-            var refreshToken = await GetRefreshToken(user).ConfigureAwait(false);
+            var refreshToken = await CreateRefreshToken(user).ConfigureAwait(false);
 
             var response = new AuthenticationResponse()
             {
@@ -122,7 +122,7 @@ namespace Infrastructure.IdentityLibrary.Services
             refreshToken.Revoked = DateTime.UtcNow;
             await _userManager.UpdateAsync(user).ConfigureAwait(false);
 
-            AuthenticationResponse response = await CreateJwtResponse(user).ConfigureAwait(false);
+            var response = await CreateJwtResponse(user).ConfigureAwait(false);
 
             return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
         }
@@ -139,8 +139,7 @@ namespace Infrastructure.IdentityLibrary.Services
                 ValidAudience = _jwtSettings.Audience,
                 IssuerSigningKey =
                     new SymmetricSecurityKey(
-                        Encoding.ASCII.GetBytes(_jwtSettings.Key)
-                    )
+                        Encoding.ASCII.GetBytes(_jwtSettings.Key))
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -177,19 +176,11 @@ namespace Infrastructure.IdentityLibrary.Services
         }
 
 
-        private async Task<RefreshToken> GetRefreshToken(ApplicationUser user)
+        private async Task<RefreshToken> CreateRefreshToken(ApplicationUser user)
         {
-            // ToDO: activate lazy loading for RefreshTokens
-            await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync();
-            var token = user.RefreshTokens.FirstOrDefault(token => token.IsActive);
-
-            if (token is null)
-            {
-                token = GenerateRefreshToken();
-                user.RefreshTokens.Add(token);
-                await _userManager.UpdateAsync(user);
-            }
-
+            var token = GenerateRefreshToken();
+            user.RefreshTokens.Add(token);
+            await _userManager.UpdateAsync(user);
             return token;
         }
 
