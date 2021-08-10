@@ -1,4 +1,5 @@
-﻿using Infrastructure.EMailLibrary.Serivices;
+﻿using Infrastructure.EMailLibrary.Models;
+using Infrastructure.EMailLibrary.Serivices;
 using Infrastructure.IdentityLibrary.Configurations;
 using Infrastructure.IdentityLibrary.Context;
 using Infrastructure.IdentityLibrary.Exceptions;
@@ -7,6 +8,7 @@ using Infrastructure.IdentityLibrary.Models.DTOs;
 using Infrastructure.IdentityLibrary.Models.Enums;
 using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -68,10 +70,10 @@ namespace Infrastructure.IdentityLibrary.Services
 
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
-            // ToDo Send E-Mail verification!
-            if(_jwtSettings.EmailConfirmationRequired)
+            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmail(user).ConfigureAwait(false))
             {
-                // send mail
+                await _userManager.DeleteAsync(user).ConfigureAwait(false);
+                throw new Exception("User registration faild");
             }
 
             return new ApiResponse<string>(user.Id, message: $"User Registered.");
@@ -93,6 +95,35 @@ namespace Infrastructure.IdentityLibrary.Services
 
             return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
         }
+
+        private async Task<bool> SendVerificationEmail(ApplicationUser user)
+        {
+            var url = await GetVerificationUrlAsync(user).ConfigureAwait(false);
+
+            var mail = new EMailRequest
+            {
+                To = user.Email,
+                Subject = "Registration",
+                Content = url
+            };
+            return await _emailService.SendEMailAsync(mail).ConfigureAwait(false);
+        }
+
+        private async Task<string> GetVerificationUrlAsync(ApplicationUser user)
+        {
+            var code = await GetVerificationCodeAsync(user).ConfigureAwait(false);
+
+            var @params = new Dictionary<string, string>
+            {
+                { VerificationEmailSettings.User, user.Id },
+                { VerificationEmailSettings.Code, code }
+            };
+
+            return QueryHelpers.AddQueryString(_jwtSettings.EmailConfirmationUrl, @params);
+        }
+
+        private async Task<string> GetVerificationCodeAsync(ApplicationUser user)
+            => await _userManager.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
 
         private async Task<AuthenticationResponse> CreateJwtResponse(ApplicationUser user)
         {

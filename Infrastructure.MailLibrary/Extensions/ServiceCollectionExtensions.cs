@@ -1,10 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Infrastructure.EMailLibrary.Serivices;
+using Infrastructure.MailLibrary.Configurations;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Infrastructure.EMailLibrary.Extensions
 {
@@ -12,6 +11,13 @@ namespace Infrastructure.EMailLibrary.Extensions
     {
         public static void AddEmailService(this IServiceCollection services, IConfiguration configuration)
         {
+            services.Configure<EMailSettings>(configuration.GetSection("EMailSettings"));
+
+            if(bool.Parse(configuration["EMailSettings:Debug"]))
+            {
+                services.AddScoped<IEmailService, EMailServiceDebug>();
+                return;
+            }
 
         }
     }

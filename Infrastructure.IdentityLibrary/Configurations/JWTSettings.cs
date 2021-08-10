@@ -12,6 +12,7 @@
         public bool SaveRefreshTokenInCookie { get; set; }
 
         public bool EmailConfirmationRequired { get; set; }
+        public string EmailConfirmationUrl { get; set; }
 
     }
 }
