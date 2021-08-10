@@ -10,6 +10,6 @@ namespace Infrastructure.EMailLibrary.Serivices
 {
     public interface IEmailService
     {
-        Task SendEMailAsync(EMailRequest mailRequest);
+        Task<bool> SendEMailAsync(EMailRequest mailRequest);
     }
 }

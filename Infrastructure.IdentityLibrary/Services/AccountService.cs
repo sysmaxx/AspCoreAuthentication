@@ -1,4 +1,5 @@
-﻿using Infrastructure.IdentityLibrary.Configurations;
+﻿using Infrastructure.EMailLibrary.Serivices;
+using Infrastructure.IdentityLibrary.Configurations;
 using Infrastructure.IdentityLibrary.Context;
 using Infrastructure.IdentityLibrary.Exceptions;
 using Infrastructure.IdentityLibrary.Models;
@@ -26,13 +27,15 @@ namespace Infrastructure.IdentityLibrary.Services
         private readonly JWTSettings _jwtSettings;
         private readonly IdentityContext _identityContext;
         private readonly ICookieService _cookieService;
+        private readonly IEmailService _emailService;
 
         public AccountService(
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IOptions<JWTSettings> jwtSettings,
             IdentityContext identityContext,
-            ICookieService cookieService
+            ICookieService cookieService,
+            IEmailService emailService
             )
         {
             _userManager = userManager;
@@ -40,6 +43,7 @@ namespace Infrastructure.IdentityLibrary.Services
             _jwtSettings = jwtSettings.Value;
             _identityContext = identityContext;
             _cookieService = cookieService;
+            _emailService = emailService;
         }
 
         public async Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin)
@@ -54,8 +58,7 @@ namespace Infrastructure.IdentityLibrary.Services
             {
                 Email = request.EMail,
                 UserName = request.UserName,
-                // ToDO Verify E-Mail
-                EmailConfirmed = true
+                EmailConfirmed = !_jwtSettings.EmailConfirmationRequired
             };
 
             var result = await _userManager.CreateAsync(user, request.Password).ConfigureAwait(false);
@@ -66,6 +69,10 @@ namespace Infrastructure.IdentityLibrary.Services
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
             // ToDo Send E-Mail verification!
+            if(_jwtSettings.EmailConfirmationRequired)
+            {
+                // send mail
+            }
 
             return new ApiResponse<string>(user.Id, message: $"User Registered.");
         }
@@ -152,7 +159,7 @@ namespace Infrastructure.IdentityLibrary.Services
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParamters, out SecurityToken securityToken);
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParamters, out _);
 
             return principal.FindFirst(CustomRegisteredClaimNames.UserID)?.Value 
                 ?? throw new SecurityTokenException($"Missing claim: {CustomRegisteredClaimNames.UserID}");
@@ -170,7 +177,6 @@ namespace Infrastructure.IdentityLibrary.Services
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(CustomRegisteredClaimNames.UserID, user.Id),
-
             };
 
             claims.AddRange(userClaims);
@@ -197,13 +203,13 @@ namespace Infrastructure.IdentityLibrary.Services
         {
             return new RefreshToken
             {
-                Token = RandomTokenString(_jwtSettings.RefreshTokenLength),
+                Token = GetRandomHexString(_jwtSettings.RefreshTokenLength),
                 Expires = DateTime.UtcNow.AddHours(_jwtSettings.RefreshTokenDurationInHours),
                 Created = DateTime.UtcNow
             };
         }
 
-        private static string RandomTokenString(int length)
+        private static string GetRandomHexString(int length)
         {
             using var cryptoProvider = new RNGCryptoServiceProvider();
             var bytes = new byte[length];

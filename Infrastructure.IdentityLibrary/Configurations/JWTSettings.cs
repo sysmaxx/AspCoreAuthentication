@@ -11,5 +11,7 @@
         public int RefreshTokenDurationInHours { get; set; }
         public bool SaveRefreshTokenInCookie { get; set; }
 
+        public bool EmailConfirmationRequired { get; set; }
+
     }
 }

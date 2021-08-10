@@ -14,7 +14,7 @@ namespace Infrastructure.EMailLibrary.Serivices
             _logger = logger;
         }
 
-        public Task SendEMailAsync(EMailRequest mailRequest)
+        public Task<bool> SendEMailAsync(EMailRequest mailRequest)
         {
             _logger.LogInformation($"Email send to: {mailRequest.To} \nsubject: {mailRequest.Subject} \nwith content: {mailRequest.Content}");
 
