@@ -19,6 +19,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using static Infrastructure.IdentityLibrary.Extensions.UriExtensions;
 
 namespace Infrastructure.IdentityLibrary.Services
 {
@@ -70,8 +71,9 @@ namespace Infrastructure.IdentityLibrary.Services
 
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
-            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmail(user).ConfigureAwait(false))
+            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmail(user, origin).ConfigureAwait(false))
             {
+                // Rollback
                 await _userManager.DeleteAsync(user).ConfigureAwait(false);
                 throw new Exception("User registration faild");
             }
@@ -96,9 +98,23 @@ namespace Infrastructure.IdentityLibrary.Services
             return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
         }
 
-        private async Task<bool> SendVerificationEmail(ApplicationUser user)
+        public async Task<ApiResponse<string>> ConfirmEmailAsync(string userId, string code)
         {
-            var url = await GetVerificationUrlAsync(user).ConfigureAwait(false);
+            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
+                ?? throw new AccountNotFoundException($"Account not found with Id: '{userId}'.");
+
+            code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+
+            if (!(await _userManager.ConfirmEmailAsync(user, code).ConfigureAwait(false)).Succeeded)
+                throw new Exception($"An error occured while confirming {user.Email}.");
+
+            return new ApiResponse<string>(user.Id, message: $"Account Confirmed for {user.Email}.");
+        }
+
+        // ToDo: Use string-based tamplate for verification email
+        private async Task<bool> SendVerificationEmail(ApplicationUser user, string origin)
+        {
+            var url = await GetVerificationUrlAsync(user, origin).ConfigureAwait(false);
 
             var mail = new EMailRequest
             {
@@ -109,21 +125,23 @@ namespace Infrastructure.IdentityLibrary.Services
             return await _emailService.SendEMailAsync(mail).ConfigureAwait(false);
         }
 
-        private async Task<string> GetVerificationUrlAsync(ApplicationUser user)
+        private async Task<string> GetVerificationUrlAsync(ApplicationUser user, string origin)
         {
             var code = await GetVerificationCodeAsync(user).ConfigureAwait(false);
 
-            var @params = new Dictionary<string, string>
+            var urlParams = new Dictionary<string, string>
             {
                 { VerificationEmailSettings.User, user.Id },
                 { VerificationEmailSettings.Code, code }
             };
 
-            return QueryHelpers.AddQueryString(_jwtSettings.EmailConfirmationUrl, @params);
+            var uri = new Uri(origin).Append(_jwtSettings.EmailConfirmationUrl);
+
+            return QueryHelpers.AddQueryString(uri.AbsoluteUri, urlParams);
         }
 
         private async Task<string> GetVerificationCodeAsync(ApplicationUser user)
-            => await _userManager.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
+            => WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await _userManager.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false)));
 
         private async Task<AuthenticationResponse> CreateJwtResponse(ApplicationUser user)
         {

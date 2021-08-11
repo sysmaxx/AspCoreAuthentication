@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Infrastructure.IdentityLibrary.Models.Enums
+﻿namespace Infrastructure.IdentityLibrary.Models.Enums
 {
-    internal struct VerificationEmailSettings
+    public struct VerificationEmailSettings
     {
-        internal const string User = "userId";
-        internal const string Code = "code";
+        public const string User = "userId";
+        public const string Code = "code";
     }
 }

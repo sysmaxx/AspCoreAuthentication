@@ -1,10 +1,7 @@
 ﻿using Infrastructure.IdentityLibrary.Models.DTOs;
+using Infrastructure.IdentityLibrary.Models.Enums;
 using Infrastructure.IdentityLibrary.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 
@@ -38,6 +35,15 @@ namespace WebApi.Controllers
         public async Task<IActionResult> RefreshTokensAsync(RefreshTokenRequest request)
         {
             return Ok(await _accountService.RefreshTokensAsync(request));
+        }
+
+        [HttpGet("confirm")]
+        public async Task<IActionResult> ConfirmAccountAsync(
+            [FromQuery(Name = VerificationEmailSettings.User)] string userId,
+            [FromQuery(Name = VerificationEmailSettings.Code)] string code)
+        {
+
+            return Ok(await _accountService.ConfirmEmailAsync(userId, code));
         }
     }
 }
