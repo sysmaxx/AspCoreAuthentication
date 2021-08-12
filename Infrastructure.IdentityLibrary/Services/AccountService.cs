@@ -81,7 +81,6 @@ namespace Infrastructure.IdentityLibrary.Services
             return new ApiResponse<string>(user.Id, message: $"User Registered.");
         }
 
-
         public async Task<ApiResponse<AuthenticationResponse>> AuthenticateUserAsync(AuthenticationRequest request)
         {
             var user = await _userManager.FindByEmailAsync(request.Email).ConfigureAwait(false)
@@ -98,17 +97,43 @@ namespace Infrastructure.IdentityLibrary.Services
             return new ApiResponse<AuthenticationResponse>(response, "Authenticated");
         }
 
-        public async Task<ApiResponse<string>> ConfirmEmailAsync(string userId, string code)
+        public async Task<ApiResponse<string>> ConfirmEmailAsync(ConfirmEmailRequest request)
         {
-            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found with Id: '{userId}'.");
+            var user = await _userManager.FindByIdAsync(request.UserId).ConfigureAwait(false)
+                ?? throw new AccountNotFoundException($"Account not found with Id: '{request.UserId}'.");
 
-            code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Code));
 
             if (!(await _userManager.ConfirmEmailAsync(user, code).ConfigureAwait(false)).Succeeded)
                 throw new Exception($"An error occured while confirming {user.Email}.");
 
             return new ApiResponse<string>(user.Id, message: $"Account Confirmed for {user.Email}.");
+        }
+
+        public async Task<ApiResponse<AuthenticationResponse>> RefreshTokensAsync(RefreshTokenRequest request)
+        {
+            var userId = GetUserIdFromToken(request.JWToken);
+
+            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
+                ?? throw new AccountNotFoundException($"Account not found.");
+
+            if (_jwtSettings.SaveRefreshTokenInCookie)
+                request.RefreshToken = _cookieService.Get(CookieSettings.Name);
+
+            // ToDO: activate lazy loading for RefreshTokens 
+            await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
+            var refreshToken = user.RefreshTokens.FirstOrDefault(token => token.Token == request.RefreshToken)
+                ?? throw new RefreshTokenNotFoundException();
+
+            if (!refreshToken.IsActive)
+                throw new RefreshTokenExpiredException();
+
+            refreshToken.Revoked = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user).ConfigureAwait(false);
+
+            var response = await CreateJwtResponse(user).ConfigureAwait(false);
+
+            return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
         }
 
         // ToDo: Use string-based tamplate for verification email
@@ -166,32 +191,6 @@ namespace Infrastructure.IdentityLibrary.Services
             return response;
         }
 
-        public async Task<ApiResponse<AuthenticationResponse>> RefreshTokensAsync(RefreshTokenRequest request)
-        {
-            var userId = GetUserIdFromToken(request.JWToken);
-
-            var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found.");
-
-            if (_jwtSettings.SaveRefreshTokenInCookie)
-                request.RefreshToken = _cookieService.Get(CookieSettings.Name);
-
-            // ToDO: activate lazy loading for RefreshTokens 
-            await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
-            var refreshToken = user.RefreshTokens.FirstOrDefault(token => token.Token == request.RefreshToken) 
-                ?? throw new RefreshTokenNotFoundException();
-
-            if (!refreshToken.IsActive)
-                throw new RefreshTokenExpiredException();
-
-            refreshToken.Revoked = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user).ConfigureAwait(false);
-
-            var response = await CreateJwtResponse(user).ConfigureAwait(false);
-
-            return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
-        }
-
         private string GetUserIdFromToken(string token)
         {
             var tokenValidationParamters = new TokenValidationParameters
@@ -239,7 +238,6 @@ namespace Infrastructure.IdentityLibrary.Services
                 signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key)), SecurityAlgorithms.HmacSha256));
         }
 
-
         private async Task<RefreshToken> CreateRefreshToken(ApplicationUser user)
         {
             var token = GenerateRefreshToken();
@@ -266,11 +264,9 @@ namespace Infrastructure.IdentityLibrary.Services
             return string.Concat(bytes.Select(b => b.ToString("X2")));
         }
 
-
-        // ConfirmEMail
+        // Change Password
 
         // ResetPassword
 
-        // Add Roles to User
     }
 }
