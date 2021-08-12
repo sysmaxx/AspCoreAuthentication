@@ -14,5 +14,7 @@
         public bool EmailConfirmationRequired { get; set; }
         public string EmailConfirmationUrl { get; set; }
 
+        public string ResetForgottenPasswordUrl { get; set; }
+
     }
 }

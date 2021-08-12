@@ -12,6 +12,7 @@ namespace WebApi.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAccountService _accountService;
+        private string Origin => Request.Headers["origin"];
 
         public AccountController(IAccountService accountService)
         {
@@ -21,29 +22,36 @@ namespace WebApi.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> RegisterAsync(RegisterUserRequest request)
         {
-            var origin = Request.Headers["origin"];
-            return Ok(await _accountService.RegisterUserAsync(request, origin));
+            return Ok(await _accountService.RegisterUserAsync(request, Origin).ConfigureAwait(false));
         }
 
         [HttpPost("authenticate")]
         public async Task<IActionResult> AuthenticateAsync(AuthenticationRequest request)
         {
-            return Ok(await _accountService.AuthenticateUserAsync(request));
+            return Ok(await _accountService.AuthenticateUserAsync(request).ConfigureAwait(false));
         }
 
         [HttpPost("refreshTokens")]
         public async Task<IActionResult> RefreshTokensAsync(RefreshTokenRequest request)
         {
-            return Ok(await _accountService.RefreshTokensAsync(request));
+            return Ok(await _accountService.RefreshTokensAsync(request).ConfigureAwait(false));
         }
 
         [HttpGet("confirm")]
         public async Task<IActionResult> ConfirmAccountAsync(
             [FromQuery(Name = VerificationEmailSettings.User)] string userId,
-            [FromQuery(Name = VerificationEmailSettings.Code)] string code)
+            [FromQuery(Name = VerificationEmailSettings.Token)] string token)
         {
-
-            return Ok(await _accountService.ConfirmEmailAsync(userId, code));
+            var request = new ConfirmEmailRequest { UserId = userId, Token = token };
+            return Ok(await _accountService.ConfirmEmailAsync(request).ConfigureAwait(false));
         }
+
+        [HttpPost("password-forgot")]
+        public async Task<IActionResult> RequestRestPasswordAsync(ForgotPasswordRequest request)
+        {
+            return Ok(await _accountService.RequestResetForgottenPasswordAsync(request, Origin).ConfigureAwait(false));
+        }
+
+        // ToDo Add Error Hanling Middleware!
     }
 }

@@ -3,6 +3,6 @@
     public struct VerificationEmailSettings
     {
         public const string User = "userId";
-        public const string Code = "code";
+        public const string Token = "token";
     }
 }

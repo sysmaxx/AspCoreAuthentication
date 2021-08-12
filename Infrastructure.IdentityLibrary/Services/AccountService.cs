@@ -71,7 +71,7 @@ namespace Infrastructure.IdentityLibrary.Services
 
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
-            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmail(user, origin).ConfigureAwait(false))
+            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmailAsync(user, origin).ConfigureAwait(false))
             {
                 // Rollback
                 await _userManager.DeleteAsync(user).ConfigureAwait(false);
@@ -102,10 +102,12 @@ namespace Infrastructure.IdentityLibrary.Services
             var user = await _userManager.FindByIdAsync(request.UserId).ConfigureAwait(false)
                 ?? throw new AccountNotFoundException($"Account not found with Id: '{request.UserId}'.");
 
-            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Code));
+            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
 
-            if (!(await _userManager.ConfirmEmailAsync(user, code).ConfigureAwait(false)).Succeeded)
-                throw new Exception($"An error occured while confirming {user.Email}.");
+            var confirmation = await _userManager.ConfirmEmailAsync(user, code).ConfigureAwait(false);
+
+            if (!confirmation.Succeeded)
+                throw new EmailConfirmationFailedException($"An error occured while confirming {user.Email}.\n {confirmation.Errors}");
 
             return new ApiResponse<string>(user.Id, message: $"Account Confirmed for {user.Email}.");
         }
@@ -136,8 +138,38 @@ namespace Infrastructure.IdentityLibrary.Services
             return new ApiResponse<AuthenticationResponse>(response, "Tokens refreshed!");
         }
 
+        public async Task<ApiResponse<string>> RequestResetForgottenPasswordAsync(ForgotPasswordRequest request, string origin)
+        {
+            var response = new ApiResponse<string>(null, "Request successful");
+            var user = await _userManager.FindByEmailAsync(request.EMail).ConfigureAwait(false);
+
+            // Prevent scanning for registered email addresses
+            if (user is null)
+                return response;
+
+            if (!await SendPasswordRestEmailAsync(user, origin))
+                throw new PasswordResetRequestFaildException();
+
+            return response;
+        }
+
+        // ToDo: Use string-based tamplate for password rest email
+        private async Task<bool> SendPasswordRestEmailAsync(ApplicationUser user, string origin)
+        {
+            var url = await GetPasswordResetUrlAsync(user, origin).ConfigureAwait(false);
+
+            var mail = new EMailRequest
+            {
+                To = user.Email,
+                Subject = "Password rest requested",
+                Content = url
+            };
+
+            return await _emailService.SendEMailAsync(mail).ConfigureAwait(false);
+        }
+
         // ToDo: Use string-based tamplate for verification email
-        private async Task<bool> SendVerificationEmail(ApplicationUser user, string origin)
+        private async Task<bool> SendVerificationEmailAsync(ApplicationUser user, string origin)
         {
             var url = await GetVerificationUrlAsync(user, origin).ConfigureAwait(false);
 
@@ -147,22 +179,32 @@ namespace Infrastructure.IdentityLibrary.Services
                 Subject = "Registration",
                 Content = url
             };
+
             return await _emailService.SendEMailAsync(mail).ConfigureAwait(false);
         }
 
         private async Task<string> GetVerificationUrlAsync(ApplicationUser user, string origin)
         {
-            var code = await GetVerificationCodeAsync(user).ConfigureAwait(false);
+            var token = await GetVerificationCodeAsync(user).ConfigureAwait(false);
 
             var urlParams = new Dictionary<string, string>
             {
                 { VerificationEmailSettings.User, user.Id },
-                { VerificationEmailSettings.Code, code }
+                { VerificationEmailSettings.Token, token }
             };
 
             var uri = new Uri(origin).Append(_jwtSettings.EmailConfirmationUrl);
 
             return QueryHelpers.AddQueryString(uri.AbsoluteUri, urlParams);
+        }
+
+        private async Task<string> GetPasswordResetUrlAsync(ApplicationUser user, string origin)
+        {
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
+
+            var uri = new Uri(origin).Append(_jwtSettings.ResetForgottenPasswordUrl);
+
+            return QueryHelpers.AddQueryString(uri.AbsoluteUri, ResetPasswordSettings.ResetToken, token);
         }
 
         private async Task<string> GetVerificationCodeAsync(ApplicationUser user)
