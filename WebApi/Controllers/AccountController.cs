@@ -39,19 +39,25 @@ namespace WebApi.Controllers
 
         [HttpGet("confirm")]
         public async Task<IActionResult> ConfirmAccountAsync(
-            [FromQuery(Name = VerificationEmailSettings.User)] string userId,
+            [FromQuery(Name = VerificationEmailSettings.User)] string user,
             [FromQuery(Name = VerificationEmailSettings.Token)] string token)
         {
-            var request = new ConfirmEmailRequest { UserId = userId, Token = token };
+            var request = new ConfirmEmailRequest { UserId = user, Token = token };
             return Ok(await _accountService.ConfirmEmailAsync(request).ConfigureAwait(false));
         }
 
         [HttpPost("password-forgot")]
         public async Task<IActionResult> RequestRestPasswordAsync(ForgotPasswordRequest request)
         {
-            return Ok(await _accountService.RequestResetForgottenPasswordAsync(request, Origin).ConfigureAwait(false));
+            return Ok(await _accountService.RequestResetForgottenPasswordAsync(request).ConfigureAwait(false));
         }
 
-        // ToDo Add Error Hanling Middleware!
+        [HttpPost("password-reset")]
+        public async Task<IActionResult> RestPasswordAsync(RestPasswordRequest request)
+        {
+            return Ok(await _accountService.RestPasswordAsync(request).ConfigureAwait(false));
+        }
+
+        // ToDo Add Error Handling Middleware!
     }
 }

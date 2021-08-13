@@ -10,6 +10,8 @@ namespace Infrastructure.IdentityLibrary.Services
         Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin);
         Task<ApiResponse<AuthenticationResponse>> RefreshTokensAsync(RefreshTokenRequest request);
         Task<ApiResponse<string>> ConfirmEmailAsync(ConfirmEmailRequest request);
-        Task<ApiResponse<string>> RequestResetForgottenPasswordAsync(ForgotPasswordRequest request, string origin);
+        Task<ApiResponse<string>> RequestResetForgottenPasswordAsync(ForgotPasswordRequest request);
+        Task<ApiResponse<string>> RestPasswordAsync(RestPasswordRequest request);
+
     }
 }

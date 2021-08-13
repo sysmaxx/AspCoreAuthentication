@@ -2,7 +2,7 @@
 
 namespace Infrastructure.IdentityLibrary.Exceptions
 {
-    class EmailConfirmationFailedException : Exception
+    public class EmailConfirmationFailedException : Exception
     {
         public EmailConfirmationFailedException()
         {

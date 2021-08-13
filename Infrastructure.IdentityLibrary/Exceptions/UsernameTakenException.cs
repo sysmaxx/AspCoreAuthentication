@@ -2,7 +2,7 @@
 
 namespace Infrastructure.IdentityLibrary.Exceptions
 {
-    class UsernameTakenException : Exception
+    public class UsernameTakenException : Exception
     {
         public UsernameTakenException()
         {

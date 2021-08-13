@@ -2,7 +2,7 @@
 
 namespace Infrastructure.IdentityLibrary.Exceptions
 {
-    class EMailTakenException : Exception
+    public class EMailTakenException : Exception
     {
         public EMailTakenException()
         {

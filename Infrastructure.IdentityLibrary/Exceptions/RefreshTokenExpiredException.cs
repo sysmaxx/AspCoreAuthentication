@@ -2,7 +2,7 @@
 
 namespace Infrastructure.IdentityLibrary.Exceptions
 {
-    class RefreshTokenExpiredException : Exception
+    public class RefreshTokenExpiredException : Exception
     {
         public RefreshTokenExpiredException()
         {
