@@ -64,15 +64,15 @@ namespace Infrastructure.IdentityLibrary.Services
             var result = await _userManager.CreateAsync(user, request.Password).ConfigureAwait(false);
 
             if (!result.Succeeded)
-                throw new Exception($"{result.Errors}");
+                throw new UserCreationFailedException(string.Join("\n",result.Errors));
 
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
-            if (_jwtSettings.EmailConfirmationRequired & !await SendVerificationEmailAsync(user, origin).ConfigureAwait(false))
+            if (_jwtSettings.EmailConfirmationRequired && !await SendVerificationEmailAsync(user, origin).ConfigureAwait(false))
             {
                 // Rollback
                 await _userManager.DeleteAsync(user).ConfigureAwait(false);
-                throw new Exception("User registration faild");
+                throw new UserCreationFailedException("User registration failed");
             }
 
             return new ApiResponse<string>(user.Id, message: $"User Registered.");

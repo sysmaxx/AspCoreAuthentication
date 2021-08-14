@@ -2,6 +2,7 @@
 using Infrastructure.IdentityLibrary.Context;
 using Infrastructure.IdentityLibrary.Models;
 using Infrastructure.IdentityLibrary.Services;
+using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -58,26 +59,19 @@ namespace Infrastructure.IdentityLibrary.Extensions
                     o.Events = new JwtBearerEvents()
                     {
                         OnAuthenticationFailed = context => { return Task.CompletedTask; },
-                        //OnAuthenticationFailed = c =>
-                        //{
-                        //    c.NoResult();
-                        //    c.Response.StatusCode = 500;
-                        //    c.Response.ContentType = "text/plain";
-                        //    return c.Response.WriteAsync(c.Exception.ToString());
-                        //},
                         OnChallenge = context =>
                         {
                             context.HandleResponse();
                             context.Response.StatusCode = 401;
                             context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize("You are not Authorized");
+                            var result = JsonSerializer.Serialize(new ApiResponse<string>("You are not Authorized"));
                             return context.Response.WriteAsync(result);
                         },
                         OnForbidden = context =>
                         {
                             context.Response.StatusCode = 403;
                             context.Response.ContentType = "application/json";
-                            var result = JsonSerializer.Serialize("You are not authorized to access this resource");
+                            var result = JsonSerializer.Serialize(new ApiResponse<string>("You are not authorized to access this resource"));
                             return context.Response.WriteAsync(result);
                         },
                     };

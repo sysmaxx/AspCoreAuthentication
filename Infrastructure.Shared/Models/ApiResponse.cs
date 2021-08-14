@@ -4,10 +4,10 @@ namespace Infrastructure.SharedLibrary.Models
 {
     public class ApiResponse<TResponse> where TResponse : class
     {
-        public bool Succeeded { get; init; }
-        public string Message { get; init; }
-        public IEnumerable<string> Errors { get; init; }
-        public TResponse Data { get; init; }
+        public bool Succeeded { get; set; }
+        public string Message { get; set; }
+        public IEnumerable<string> Errors { get; set; }
+        public TResponse Data { get; set; }
 
         public ApiResponse(TResponse data, string message = null)
         {

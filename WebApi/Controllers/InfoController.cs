@@ -1,4 +1,5 @@
 ﻿using Infrastructure.IdentityLibrary.Services;
+using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,7 @@ namespace WebApi.Controllers
             _authenticatedUserService = authenticatedUserService;
         }
 
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ServiceInfo))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ApiResponse<ServiceInfo>))]
         [HttpGet()]
         [Authorize(Roles = "User")]
         public ActionResult<string> Info()
@@ -28,7 +29,7 @@ namespace WebApi.Controllers
             var lastUpdate = System.IO.File.GetLastWriteTime(assembly.Location);
             var version = FileVersionInfo.GetVersionInfo(assembly.Location).ProductVersion;
 
-            return Ok(new ServiceInfo { Version = version, LastUpdate = lastUpdate, UserId = _authenticatedUserService.UserId });
+            return Ok(new ApiResponse<ServiceInfo>(new ServiceInfo { Version = version, LastUpdate = lastUpdate, UserId = _authenticatedUserService.UserId }));
         }
     }
 }

@@ -51,6 +51,7 @@ namespace WebApi
             app.UseAuthorization();
 
             app.UseSwaggerExtension();
+            app.UseExceptionHandlingMiddleware();
 
             app.UseHealthChecks("/health");
 

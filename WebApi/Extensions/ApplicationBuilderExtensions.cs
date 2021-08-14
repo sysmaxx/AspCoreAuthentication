@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using WebApi.Middlewares;
 
 namespace WebApi.Extensions
 {
@@ -15,6 +16,11 @@ namespace WebApi.Extensions
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebApi");
             });
+        }
+
+        public static void UseExceptionHandlingMiddleware(this IApplicationBuilder app)
+        {
+            app.UseMiddleware<ExceptionHandlerMiddleware>();
         }
     }
 }
