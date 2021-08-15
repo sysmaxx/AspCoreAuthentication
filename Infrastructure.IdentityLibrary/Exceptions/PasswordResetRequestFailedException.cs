@@ -2,13 +2,13 @@
 
 namespace Infrastructure.IdentityLibrary.Exceptions
 {
-    public class UsernameTakenException : ApiException
+    class PasswordResetRequestFailedException :  ApiException
     {
-        public UsernameTakenException()
+        public PasswordResetRequestFailedException()
         {
 
         }
-        public UsernameTakenException(string msg)
+        public PasswordResetRequestFailedException(string msg)
             : base(msg)
         {
 

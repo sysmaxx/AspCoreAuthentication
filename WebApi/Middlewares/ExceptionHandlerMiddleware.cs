@@ -1,4 +1,5 @@
 ﻿using Infrastructure.IdentityLibrary.Exceptions;
+using Infrastructure.SharedLibrary.Exceptions;
 using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -43,6 +44,11 @@ namespace WebApi.Middlewares
                         break;
                     case KeyNotFoundException:
                         response.StatusCode = (int)HttpStatusCode.NotFound;
+                        break;
+
+                    case ApiException:
+                        response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                        responseModel.Errors = ((ApiException)error).Errors;
                         break;
                     default:
                         _logger.LogError(error, "Middleware catched unhandled Exception", null);

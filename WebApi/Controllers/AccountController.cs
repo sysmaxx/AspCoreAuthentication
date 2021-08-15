@@ -58,6 +58,6 @@ namespace WebApi.Controllers
             return Ok(await _accountService.RestPasswordAsync(request).ConfigureAwait(false));
         }
 
-        // ToDo Add Error Handling Middleware!
+        // ToDo: Swagger response documentation
     }
 }

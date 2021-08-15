@@ -6,9 +6,11 @@ using Infrastructure.IdentityLibrary.Exceptions;
 using Infrastructure.IdentityLibrary.Models;
 using Infrastructure.IdentityLibrary.Models.DTOs;
 using Infrastructure.IdentityLibrary.Models.Enums;
+using Infrastructure.SharedLibrary.Exceptions;
 using Infrastructure.SharedLibrary.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -30,13 +32,15 @@ namespace Infrastructure.IdentityLibrary.Services
         private readonly IdentityContext _identityContext;
         private readonly ICookieService _cookieService;
         private readonly IEmailService _emailService;
+        private readonly ILogger<AccountService> _logger;
 
         public AccountService(
             UserManager<ApplicationUser> userManager,
             IOptions<JWTSettings> jwtSettings,
             IdentityContext identityContext,
             ICookieService cookieService,
-            IEmailService emailService
+            IEmailService emailService,
+            ILogger<AccountService> logger
             )
         {
             _userManager = userManager;
@@ -44,15 +48,28 @@ namespace Infrastructure.IdentityLibrary.Services
             _identityContext = identityContext;
             _cookieService = cookieService;
             _emailService = emailService;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<string>> RegisterUserAsync(RegisterUserRequest request, string origin)
         {
             if (await _userManager.FindByNameAsync(request.UserName).ConfigureAwait(false) is not null)
-                throw new UsernameTakenException($"Username '{request.UserName}' is already taken.");
+            {
+                ApiExceptionBuilder<UsernameTakenException>
+                    .Create()
+                    .WithMessage("Registration failed")
+                    .WithError($"Username '{request.UserName}' is already taken.")
+                    .Throw();
+            }
 
             if (await _userManager.FindByEmailAsync(request.EMail).ConfigureAwait(false) is not null)
-                throw new EMailTakenException($"EMail '{request.EMail}' is already taken.");
+            {
+                ApiExceptionBuilder<EMailTakenException>
+                    .Create()
+                    .WithMessage("Registration failed")
+                    .WithError($"EMail '{request.EMail}' is already taken.")
+                    .Throw();
+            }
 
             var user = new ApplicationUser
             {
@@ -64,7 +81,13 @@ namespace Infrastructure.IdentityLibrary.Services
             var result = await _userManager.CreateAsync(user, request.Password).ConfigureAwait(false);
 
             if (!result.Succeeded)
-                throw new UserCreationFailedException(string.Join("\n",result.Errors));
+            {
+                ApiExceptionBuilder<UserCreationFailedException>
+                    .Create()
+                    .WithMessage("Registration failed")
+                    .WithErrors(result.Errors.Select(er => er.Description))
+                    .Throw();
+            }
 
             await _userManager.AddToRoleAsync(user, Roles.User.ToString()).ConfigureAwait(false);
 
@@ -72,22 +95,46 @@ namespace Infrastructure.IdentityLibrary.Services
             {
                 // Rollback
                 await _userManager.DeleteAsync(user).ConfigureAwait(false);
-                throw new UserCreationFailedException("User registration failed");
+
+                ApiExceptionBuilder<UserCreationFailedException>
+                    .Create()
+                    .WithMessage("Registration failed")
+                    .WithError("Error while sending verification mail")
+                    .Throw();
             }
 
-            return new ApiResponse<string>(user.Id, message: $"User Registered.");
+            return new ApiResponse<string>(user.Email, message: $"User Registered.");
         }
 
         public async Task<ApiResponse<AuthenticationResponse>> AuthenticateUserAsync(AuthenticationRequest request)
         {
             var user = await _userManager.FindByEmailAsync(request.Email).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found with EMail: '{request.Email}'.");
+                ?? throw ApiExceptionBuilder<AccountNotFoundException>
+                    .Create()
+                    .WithMessage("Authentication failed")
+                    .WithError($"Account not found with EMail: '{request.Email}'.")
+                    .Build();
 
             if (!user.EmailConfirmed)
-                throw new AccountNotConfirmedException($"E-Mail: '{request.Email}' not confirmed.");
+            {
+                ApiExceptionBuilder<AccountNotConfirmedException>
+                    .Create()
+                    .WithMessage("Authentication failed")
+                    .WithError($"E-Mail: '{request.Email}' not confirmed.")
+                    .Throw();
+            }
 
             if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
-                throw new InvalidCredentialsException($"Invalid credentials for EMail: '{request.Email}'.");
+            {
+                
+                // ToDo lockout user for some seconds
+
+                ApiExceptionBuilder<InvalidCredentialsException>
+                    .Create()
+                    .WithMessage("Authentication failed")
+                    .WithError($"Invalid credentials for EMail: '{request.Email}'.")
+                    .Throw();
+            }
 
             AuthenticationResponse response = await CreateJwtResponse(user).ConfigureAwait(false);
 
@@ -97,14 +144,24 @@ namespace Infrastructure.IdentityLibrary.Services
         public async Task<ApiResponse<string>> ConfirmEmailAsync(ConfirmEmailRequest request)
         {
             var user = await _userManager.FindByIdAsync(request.UserId).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found with Id: '{request.UserId}'.");
+                ?? throw ApiExceptionBuilder<AccountNotFoundException>
+                    .Create()
+                    .WithMessage("E-Mail confirmation failed")
+                    .WithError($"Account not found with Id: '{request.UserId}'.")
+                    .Build();
 
             var token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
 
             var confirmation = await _userManager.ConfirmEmailAsync(user, token).ConfigureAwait(false);
 
             if (!confirmation.Succeeded)
-                throw new EmailConfirmationFailedException($"An error occured while confirming {user.Email}.\n {confirmation.Errors}");
+            {
+                ApiExceptionBuilder<EmailConfirmationFailedException>
+                    .Create()
+                    .WithMessage("E-Mail confirmation failed")
+                    .WithErrors(confirmation.Errors.Select(er => er.Description))
+                    .Throw();
+            }
 
             return new ApiResponse<string>(user.Id, message: $"Account Confirmed for {user.Email}.");
         }
@@ -114,7 +171,11 @@ namespace Infrastructure.IdentityLibrary.Services
             var userId = GetUserIdFromToken(request.JWToken);
 
             var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found.");
+                ?? throw ApiExceptionBuilder<AccountNotFoundException>
+                    .Create()
+                    .WithMessage("Refreshing the Tokens failed")
+                    .WithError($"Account not found with Id: '{userId}'.")
+                    .Build();
 
             if (_jwtSettings.SaveRefreshTokenInCookie)
                 request.RefreshToken = _cookieService.Get(CookieSettings.Name);
@@ -122,10 +183,20 @@ namespace Infrastructure.IdentityLibrary.Services
             // ToDO: activate lazy loading for RefreshTokens 
             await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
             var refreshToken = user.RefreshTokens.FirstOrDefault(token => token.Token == request.RefreshToken)
-                ?? throw new RefreshTokenNotFoundException();
+                ?? throw ApiExceptionBuilder<RefreshTokenNotFoundException>
+                    .Create()
+                    .WithMessage("Refreshing the Tokens failed")
+                    .WithError($"Token does not exist")
+                    .Build();
 
             if (!refreshToken.IsActive)
-                throw new RefreshTokenExpiredException();
+            {
+                ApiExceptionBuilder<RefreshTokenExpiredException>
+                    .Create()
+                    .WithMessage("Refreshing the Tokens failed")
+                    .WithError($"The token is expired")
+                    .Throw();
+            }
 
             refreshToken.Revoked = DateTime.UtcNow;
             await _userManager.UpdateAsync(user).ConfigureAwait(false);
@@ -142,10 +213,19 @@ namespace Infrastructure.IdentityLibrary.Services
 
             // Prevent scanning for registered email addresses
             if (user is null)
+            {
+                _logger.LogInformation($"Request to reset password for unknown email rejected: {request.Email}");
                 return response;
+            }
 
             if (!await SendPasswordRestEmailAsync(user))
-                throw new PasswordResetRequestFaildException();
+            {
+                ApiExceptionBuilder<PasswordResetRequestFailedException>
+                    .Create()
+                    .WithMessage("Password reset failed")
+                    .WithError($"Error while sending password reset mail")
+                    .Throw();
+            }
 
             return response;
         }
@@ -153,14 +233,24 @@ namespace Infrastructure.IdentityLibrary.Services
         public async Task<ApiResponse<string>> RestPasswordAsync(RestPasswordRequest request)
         {
             var user = await _userManager.FindByEmailAsync(request.Email).ConfigureAwait(false)
-                ?? throw new AccountNotFoundException($"Account not found with EMail: '{request.Email}'.");
+                ?? throw ApiExceptionBuilder<AccountNotFoundException>
+                    .Create()
+                    .WithMessage("Resetting password failed")
+                    .WithError($"Account not found with email: '{request.Email}'.")
+                    .Build();
 
             var token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
 
             var result = await _userManager.ResetPasswordAsync(user, token, request.Password).ConfigureAwait(false);
 
             if (!result.Succeeded)
-                throw new PasswordResetFailedException(string.Join("\n", result.Errors.Select(x => x.Description)));
+            {
+                ApiExceptionBuilder<PasswordResetFailedException>
+                    .Create()
+                    .WithMessage("Resetting password failed")
+                    .WithErrors(result.Errors.Select(er => er.Description))
+                    .Throw();
+            }
 
             // ToDO: activate lazy loading for RefreshTokens 
             await _identityContext.Entry(user).Collection(t => t.RefreshTokens).LoadAsync().ConfigureAwait(false);
@@ -326,10 +416,6 @@ namespace Infrastructure.IdentityLibrary.Services
             cryptoProvider.GetBytes(bytes);
             return string.Concat(bytes.Select(b => b.ToString("X2")));
         }
-
-        // Change Password
-
-        // ResetPassword
 
     }
 }
